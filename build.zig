@@ -101,7 +101,7 @@ pub fn build(b: *std.Build) void {
         .HAVE_OPENSSL_ECC = with_openssl,
         .HAVE_GCRYPT_ECC = with_gcrypt,
         .HAVE_ECC = 1,
-        .HAVE_GLOB_GL_FLAGS_MEMBER = 1,
+        .HAVE_GLOB_GL_FLAGS_MEMBER = target.result.abi != .musl,
         .HAVE_GCRYPT_CHACHA_POLY = with_gcrypt,
         .HAVE_OPENSSL_EVP_CHACHA20 = with_openssl,
         .HAVE_OPENSSL_EVP_KDF_CTX = with_openssl,
