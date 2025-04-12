@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
     const with_abi_break = b.option(bool, "abi_break", "Allow ABI break") orelse false;
     const with_gex = b.option(bool, "gex", "Enable DH Group exchange mechanisms") orelse true;
     const with_insecure_none = b.option(bool, "insecure_none", "Enable insecure none cipher and MAC algorithms (not suitable for production!)") orelse false;
-    const with_exec = b.option(bool, "exec", "Enable libssh to execute arbitrary commands from configuration files or options (match exec, proxy commands and OpenSSH-based proxy-jumps).") orelse true;
+    const with_exec = b.option(bool, "exec", "Enable libssh to execute arbitrary commands from configuration files or options (match exec, proxy commands and OpenSSH-based proxy-jumps).");
     const fuzz_testing = b.option(bool, "fuzz_testing", "Build with fuzzer for the server and client (automatically enables none chiper!)") orelse false;
     const picky_developer = b.option(bool, "picky_developer", "Build with picky developer flags") orelse false;
     const with_hermetic_usr = b.option(bool, "hermetic_usr", "Build with support for hermetic /usr/") orelse false;
@@ -66,6 +66,20 @@ pub fn build(b: *std.Build) void {
         .include_path = "libssh/libssh_version.h",
     }, version_conf);
 
+    const have_argp = target.result.os.tag == .linux;
+    const have_libutil = false;
+    const have_pty = target.result.os.tag == .linux;
+    const is_unix = target.result.os.tag == .linux or target.result.os.tag == .macos;
+    const is_windows = target.result.os.tag == .windows;
+
+    var enable_exec: bool = undefined;
+    if (with_exec) |exe| {
+        if (exe == true and is_windows) @panic("exec is unsupported on Windows");
+        enable_exec = exe;
+    } else {
+        enable_exec = !is_windows;
+    }
+
     const config = .{
         .PROJECT_NAME = "libssh",
         .PROJECT_VERSION = version,
@@ -76,21 +90,21 @@ pub fn build(b: *std.Build) void {
         .GLOBAL_BIND_CONFIG = "/etc/ssh/libssh_server_config",
         .USR_GLOBAL_CLIENT_CONFIG = "TODO",
         .GLOBAL_CLIENT_CONFIG = "/etc/ssh/ssh_config",
-        .HAVE_ARGP_H = target.result.os.tag != .macos,
-        .HAVE_ARPA_INET_H = 1,
-        .HAVE_GLOB_H = 1,
+        .HAVE_ARGP_H = have_argp,
+        .HAVE_ARPA_INET_H = is_unix,
+        .HAVE_GLOB_H = is_unix,
         .HAVE_VALGRIND_VALGRIND_H = unit_testing,
-        .HAVE_PTY_H = 1,
+        .HAVE_PTY_H = have_pty,
         .HAVE_UTMP_H = 1,
-        .HAVE_UTIL_H = 0,
-        .HAVE_LIBUTIL_H = 0,
+        .HAVE_UTIL_H = target.result.os.tag == .macos,
+        .HAVE_LIBUTIL_H = have_libutil,
         .HAVE_SYS_TIME_H = 1,
         .HAVE_SYS_UTIME_H = 0,
         .HAVE_IO_H = 1,
-        .HAVE_TERMIOS_H = 1,
+        .HAVE_TERMIOS_H = is_unix,
         .HAVE_UNISTD_H = 1,
         .HAVE_STDINT_H = 1,
-        .HAVE_IFADDRS_H = 1,
+        .HAVE_IFADDRS_H = is_unix,
         .HAVE_OPENSSL_AES_H = with_openssl,
         .HAVE_WSPIAPI_H = 1,
         .HAVE_OPENSSL_DES_H = with_openssl,
@@ -114,10 +128,10 @@ pub fn build(b: *std.Build) void {
         .HAVE__VSNPRINTF_S = 1,
         .HAVE_ISBLANK = 1,
         .HAVE_STRNCPY = 1,
-        .HAVE_STRNDUP = 1,
+        .HAVE_STRNDUP = is_unix,
         .HAVE_CFMAKERAW = 1,
         .HAVE_GETADDRINFO = 1,
-        .HAVE_POLL = 1,
+        .HAVE_POLL = is_unix,
         .HAVE_SELECT = 1,
         .HAVE_CLOCK_GETTIME = 1,
         .HAVE_NTOHLL = 0,
@@ -125,16 +139,16 @@ pub fn build(b: *std.Build) void {
         .HAVE_STRTOULL = 1,
         .HAVE___STRTOULL = 1,
         .HAVE__STRTOUI64 = 1,
-        .HAVE_GLOB = 1,
-        .HAVE_EXPLICIT_BZERO = target.result.os.tag != .macos,
-        .HAVE_MEMSET_S = 1,
+        .HAVE_GLOB = is_unix,
+        .HAVE_EXPLICIT_BZERO = target.result.os.tag == .linux,
+        .HAVE_MEMSET_S = is_unix,
         .HAVE_SECURE_ZERO_MEMORY = 1,
         .HAVE_CMOCKA_SET_TEST_FILTER = unit_testing,
         .HAVE_BLOWFISH = with_blowfish_cipher,
         .HAVE_LIBCRYPTO = with_openssl,
         .HAVE_LIBGCRYPT = with_gcrypt,
         .HAVE_LIBMBEDCRYPTO = with_mbedtls,
-        // TODO Threading not working with zig mbedtls
+        // TODO Threading not working with the zig built mbedtls
         .HAVE_PTHREAD = !with_mbedtls,
         .HAVE_CMOCKA = unit_testing,
         .HAVE_GCC_THREAD_LOCAL_STORAGE = 0,
@@ -154,7 +168,7 @@ pub fn build(b: *std.Build) void {
         .WITH_SERVER = with_server,
         .WITH_GEX = with_gex,
         .WITH_INSECURE_NONE = with_insecure_none,
-        .WITH_EXEC = with_exec,
+        .WITH_EXEC = enable_exec,
         .WITH_BLOWFISH_CIPHER = with_blowfish_cipher,
         .DEBUG_CRYPTO = with_debug_crypto,
         .DEBUG_PACKET = with_debug_packet,
@@ -178,6 +192,11 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+
+    if (is_windows) {
+        libssh.root_module.addCMacro("_WIN32", "1");
+    }
+    libssh.root_module.addCMacro("LIBSSH_STATIC", "1");
 
     libssh.addConfigHeader(version_header);
     libssh.addConfigHeader(config_header);
@@ -482,7 +501,6 @@ pub fn build(b: *std.Build) void {
                 exe.linkLibrary(self.common);
                 exe.linkLibrary(self.libssh);
                 if (is_cpp) {
-                    // exe.addIncludePath(self.root.path(self.b, "include"));
                     exe.linkLibCpp();
                 }
                 self.b.installArtifact(exe);
@@ -498,23 +516,42 @@ pub fn build(b: *std.Build) void {
             .root = root,
         };
 
-        examples.add("exec");
-        examples.add("keygen");
-        examples.add("keygen2");
-        examples.add("libssh_scp");
-        // examples.add("proxy"); TODO Enable gssapi
-        examples.add("sample_sftpserver");
-        examples.add("samplesftp");
-        examples.add("samplesshd-cb");
-        examples.add("samplesshd-kbdint");
-        examples.add("scp_download");
-        examples.add("senddata");
-        examples.add("ssh_X11_client");
-        examples.add("ssh_client");
-        examples.add("ssh_server");
-        // examples.add("sshd_direct-tcpip"); TODO Enable gssapi
-        examples.add("sshnetcat");
-        examples.add("libsshpp");
-        examples.add("libsshpp_noexcept");
+        if (is_unix) {
+            examples.add("libssh_scp");
+            examples.add("scp_download");
+            examples.add("sshnetcat");
+
+            if (with_sftp) {
+                examples.add("samplesftp");
+                if (with_server) {
+                    examples.add("sample_sftpserver");
+                }
+            }
+
+            examples.add("ssh_client");
+            examples.add("ssh_X11_client");
+
+            if (with_server and (have_argp)) {
+                if (have_libutil) {
+                    examples.add("ssh_server");
+                }
+                if (with_gssapi) {
+                    examples.add("proxy");
+                    examples.add("sshd_direct-tcpip");
+                }
+                examples.add("samplesshd-kbdint");
+                examples.add("keygen2");
+            }
+
+            if (with_server) {
+                examples.add("samplesshd-cb");
+            }
+
+            examples.add("exec");
+            examples.add("senddata");
+            examples.add("keygen");
+            examples.add("libsshpp");
+            examples.add("libsshpp_noexcept");
+        }
     }
 }
