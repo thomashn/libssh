@@ -184,6 +184,7 @@ pub fn build(b: *std.Build) void {
     libssh.addIncludePath(root.path(b, "include"));
     libssh.installHeadersDirectory(root.path(b, "include"), ".", .{});
     libssh.installConfigHeader(config_header);
+    libssh.installConfigHeader(version_header);
     libssh.linkLibC();
 
     if (with_zlib) {
