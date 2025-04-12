@@ -1,0 +1,30 @@
+.{
+    .name = .libssh,
+    .version = "0.11.1",
+    .fingerprint = 0xda355160da7dff73,
+    .minimum_zig_version = "0.14.0",
+    .dependencies = .{
+        .libssh = .{
+            .url = "https://git.libssh.org/projects/libssh.git/snapshot/libssh-0.11.1.tar.gz",
+            .hash = "N-V-__8AAOxoTADX_2bbFE0mOj8C4eTWZh4gP8w7a_oF-ipd",
+        },
+        .mbedtls = .{
+            .url = "git+https://github.com/allyourcodebase/mbedtls#7d862fe61ff2eac37ee54e1e017fc287bed1cd7a",
+            .hash = "mbedtls-3.6.2-E4NURzYUAABWLBwHJWx_ppb_j2kDSoGfCfR2rI2zs9dz",
+        },
+        .zlib = .{
+            .url = "https://github.com/allyourcodebase/zlib/archive/refs/tags/1.3.1.tar.gz",
+            .hash = "zlib-1.3.1-AAAAACEMAAA0qyoSrfgBb_p25ItL4yRf_TBRk-26TYMF",
+        },
+        .openssl = .{
+            .url = "git+https://github.com/allyourcodebase/openssl#f348124c5382bcc377f1b3277357cbf2ed2fb8db",
+            .hash = "openssl-3.3.1-2-TC9C3Se3ZACF5WO_CjoD7Bt_X94oCsAAbbwhOp1rTZBe",
+        },
+    },
+    .paths = .{
+        "LICENSE",
+        "README.md",
+        "build.zig",
+        "build.zig.zon",
+    },
+}
