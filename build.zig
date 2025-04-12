@@ -182,7 +182,7 @@ pub fn build(b: *std.Build) void {
     libssh.addConfigHeader(version_header);
     libssh.addConfigHeader(config_header);
     libssh.addIncludePath(root.path(b, "include"));
-    libssh.installHeadersDirectory(root.path(b, "include"), ".", .{});
+    libssh.installHeadersDirectory(root.path(b, "include"), ".", .{ .include_extensions = &.{ ".h", ".hpp" } });
     libssh.installConfigHeader(config_header);
     libssh.installConfigHeader(version_header);
     libssh.linkLibC();
@@ -481,8 +481,10 @@ pub fn build(b: *std.Build) void {
                 exe.addCSourceFile(.{ .file = self.root.path(self.b, path) });
                 exe.linkLibrary(self.common);
                 exe.linkLibrary(self.libssh);
-                if (is_cpp)
+                if (is_cpp) {
+                    // exe.addIncludePath(self.root.path(self.b, "include"));
                     exe.linkLibCpp();
+                }
                 self.b.installArtifact(exe);
             }
         };
