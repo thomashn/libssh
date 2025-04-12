@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+
+jobs:
+  build_linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: korandoru/setup-zig@v1.4.0
+        with:
+          zig-version: 0.14.0
+      - name: Build
+        run: zig build -Dexamples=true
+  build_mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: korandoru/setup-zig@v1.4.0
+        with:
+          zig-version: 0.14.0
+      - name: Build
+        run: zig build -Dexamples=true
+  build_windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: korandoru/setup-zig@v1.4.0
+        with:
+          zig-version: 0.14.0
+      - name: Build
+        run: zig build -Dexamples=true -Dmbedtls=true
