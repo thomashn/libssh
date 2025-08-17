@@ -9,7 +9,7 @@
             .hash = "N-V-__8AALvVTACiGNxqSQlRY-WVJjzZ_WYE1kvF8PVYl5aF",
         },
         .mbedtls = .{
-            .url = "git+https://github.com/allyourcodebase/mbedtls#7d862fe61ff2eac37ee54e1e017fc287bed1cd7a",
+            .url = "git+https://github.com/allyourcodebase/mbedtls.git#7d862fe61ff2eac37ee54e1e017fc287bed1cd7a",
             .hash = "mbedtls-3.6.2-E4NURzYUAABWLBwHJWx_ppb_j2kDSoGfCfR2rI2zs9dz",
         },
         .zlib = .{
