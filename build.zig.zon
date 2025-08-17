@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.14.0",
     .dependencies = .{
         .libssh = .{
-            .url = "https://git.libssh.org/projects/libssh.git/snapshot/libssh-0.11.1.tar.gz",
-            .hash = "N-V-__8AAOxoTADX_2bbFE0mOj8C4eTWZh4gP8w7a_oF-ipd",
+            .url = "https://git.libssh.org/projects/libssh.git/snapshot/libssh-0.11.2.tar.gz",
+            .hash = "N-V-__8AALvVTACiGNxqSQlRY-WVJjzZ_WYE1kvF8PVYl5aF",
         },
         .mbedtls = .{
             .url = "git+https://github.com/allyourcodebase/mbedtls#7d862fe61ff2eac37ee54e1e017fc287bed1cd7a",
