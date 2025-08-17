@@ -2,7 +2,7 @@ const std = @import("std");
 
 const major = "0";
 const minor = "11";
-const patch = "1";
+const patch = "2";
 const version = major ++ "." ++ minor ++ "." ++ patch;
 
 pub fn build(b: *std.Build) void {

@@ -1,6 +1,6 @@
 .{
     .name = .libssh,
-    .version = "0.11.1",
+    .version = "0.11.2",
     .fingerprint = 0xda355160da7dff73,
     .minimum_zig_version = "0.14.0",
     .dependencies = .{
