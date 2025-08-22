@@ -1,9 +1,9 @@
 const std = @import("std");
 
-const major = "0";
-const minor = "11";
-const patch = "2";
-const version = major ++ "." ++ minor ++ "." ++ patch;
+const major = 0;
+const minor = 11;
+const patch = 2;
+const version = std.fmt.comptimePrint("{}.{}.{}", .{ major, minor, patch });
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -187,10 +187,18 @@ pub fn build(b: *std.Build) void {
         .include_path = "config.h",
     }, config);
 
-    const libssh = b.addStaticLibrary(.{
+    const libssh = b.addLibrary(.{
         .name = "libssh",
-        .target = target,
-        .optimize = optimize,
+        .version = .{
+            .major = major,
+            .minor = minor,
+            .patch = patch,
+        },
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
+        .linkage = .static,
     });
 
     if (is_windows) {
@@ -466,10 +474,13 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(libssh);
 
     if (with_examples) {
-        const common = b.addSharedLibrary(.{
+        const common = b.addLibrary(.{
             .name = "common",
-            .target = target,
-            .optimize = optimize,
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+            }),
+            .linkage = .static,
         });
         common.addCSourceFiles(.{
             .root = root.path(b, "examples"),
@@ -480,6 +491,7 @@ pub fn build(b: *std.Build) void {
             },
         });
         common.linkLibrary(libssh);
+        //b.installArtifact(common);
 
         const Examples = struct {
             b: *std.Build,
@@ -492,8 +504,10 @@ pub fn build(b: *std.Build) void {
             pub fn add(self: @This(), comptime name: []const u8) void {
                 const exe = self.b.addExecutable(.{
                     .name = name,
-                    .optimize = self.optimize,
-                    .target = self.target,
+                    .root_module = self.b.createModule(.{
+                        .optimize = self.optimize,
+                        .target = self.target,
+                    }),
                 });
                 const is_cpp = comptime std.mem.containsAtLeast(u8, name, 1, "hpp");
                 const path = if (is_cpp) "examples/" ++ name ++ ".cpp" else "examples/" ++ name ++ ".c";

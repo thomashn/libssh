@@ -2,23 +2,23 @@
     .name = .libssh,
     .version = "0.11.2",
     .fingerprint = 0xda355160da7dff73,
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.15.1",
     .dependencies = .{
         .libssh = .{
             .url = "https://git.libssh.org/projects/libssh.git/snapshot/libssh-0.11.2.tar.gz",
             .hash = "N-V-__8AALvVTACiGNxqSQlRY-WVJjzZ_WYE1kvF8PVYl5aF",
         },
         .mbedtls = .{
-            .url = "git+https://github.com/allyourcodebase/mbedtls.git#7d862fe61ff2eac37ee54e1e017fc287bed1cd7a",
-            .hash = "mbedtls-3.6.2-E4NURzYUAABWLBwHJWx_ppb_j2kDSoGfCfR2rI2zs9dz",
+            .url = "https://github.com/thomashn/mbedtls/archive/refs/heads/zig-0.15.1.zip",
+            .hash = "mbedtls-3.6.2-E4NUR3cUAAB3meZe5pEWr27YQKWCa91g0oUtDDVfuNvY",
         },
         .zlib = .{
-            .url = "https://github.com/allyourcodebase/zlib/archive/refs/tags/1.3.1.tar.gz",
-            .hash = "zlib-1.3.1-AAAAACEMAAA0qyoSrfgBb_p25ItL4yRf_TBRk-26TYMF",
+            .url = "git+https://github.com/allyourcodebase/zlib.git#61e7df7e996ec5a5f13a653db3c419adb340d6ef",
+            .hash = "zlib-1.3.1-ZZQ7lbYMAAB1hTSOKSXAKAgHsfDcyWNH_37ojw5WSpgR",
         },
         .openssl = .{
-            .url = "git+https://github.com/allyourcodebase/openssl#f348124c5382bcc377f1b3277357cbf2ed2fb8db",
-            .hash = "openssl-3.3.1-2-TC9C3Se3ZACF5WO_CjoD7Bt_X94oCsAAbbwhOp1rTZBe",
+            .url = "git+https://github.com/allyourcodebase/openssl.git#cad7ccba47e42fa608ca655ec14ae33202df86e1",
+            .hash = "openssl-3.3.2-TC9C3Wa3ZACgB1hZbrLOQCK9XccIBaW_F3imFfIeYP06",
         },
     },
     .paths = .{
