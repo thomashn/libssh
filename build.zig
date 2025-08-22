@@ -66,7 +66,7 @@ pub fn build(b: *std.Build) void {
         .include_path = "libssh/libssh_version.h",
     }, version_conf);
 
-    const have_argp = target.result.os.tag == .linux;
+    const have_argp = target.result.os.tag == .linux and target.result.abi != .musl;
     const have_libutil = false;
     const have_pty = target.result.os.tag == .linux;
     const is_unix = target.result.os.tag == .linux or target.result.os.tag == .macos;
