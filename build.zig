@@ -2,7 +2,7 @@ const std = @import("std");
 
 const major = 0;
 const minor = 11;
-const patch = 2;
+const patch = 3;
 const version = std.fmt.comptimePrint("{}.{}.{}", .{ major, minor, patch });
 
 pub fn build(b: *std.Build) void {
@@ -206,24 +206,24 @@ pub fn build(b: *std.Build) void {
     }
     libssh.root_module.addCMacro("LIBSSH_STATIC", "1");
 
-    libssh.addConfigHeader(version_header);
-    libssh.addConfigHeader(config_header);
-    libssh.addIncludePath(root.path(b, "include"));
+    libssh.root_module.addConfigHeader(version_header);
+    libssh.root_module.addConfigHeader(config_header);
+    libssh.root_module.addIncludePath(root.path(b, "include"));
     libssh.installHeadersDirectory(root.path(b, "include"), ".", .{ .include_extensions = &.{ ".h", ".hpp" } });
     libssh.installConfigHeader(config_header);
     libssh.installConfigHeader(version_header);
-    libssh.linkLibC();
+    libssh.root_module.link_libc = true;
 
     if (with_zlib) {
         const zlib = b.dependency("zlib", .{
             .target = target,
             .optimize = optimize,
         });
-        libssh.linkLibrary(zlib.artifact("z"));
+        libssh.root_module.linkLibrary(zlib.artifact("z"));
     }
 
     if (with_gcrypt) {
-        libssh.linkSystemLibrary("gcrypt");
+        libssh.root_module.linkSystemLibrary("gcrypt", .{});
     }
 
     if (with_mbedtls) {
@@ -231,7 +231,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         });
-        libssh.linkLibrary(mbedtls.artifact("mbedtls"));
+        libssh.root_module.linkLibrary(mbedtls.artifact("mbedtls"));
         libssh.installLibraryHeaders(mbedtls.artifact("mbedtls"));
     }
 
@@ -243,15 +243,15 @@ pub fn build(b: *std.Build) void {
                 .target = target,
                 .optimize = optimize,
             });
-            libssh.linkLibrary(crypto.artifact("openssl"));
+            libssh.root_module.linkLibrary(crypto.artifact("openssl"));
         } else {
-            libssh.linkSystemLibrary("crypto");
+            libssh.root_module.linkSystemLibrary("crypto", .{});
         }
     }
 
     const libssh_src = root.path(b, "src");
 
-    libssh.addCSourceFiles(.{
+    libssh.root_module.addCSourceFiles(.{
         .root = libssh_src,
         .files = &.{
             "agent.c",
@@ -307,7 +307,7 @@ pub fn build(b: *std.Build) void {
 
     if (config.HAVE_PTHREAD) {
         if (target.result.os.tag == .linux or target.result.os.tag == .macos) {
-            libssh.addCSourceFiles(.{
+            libssh.root_module.addCSourceFiles(.{
                 .root = libssh_src,
                 .files = &.{
                     "threads/noop.c",
@@ -315,7 +315,7 @@ pub fn build(b: *std.Build) void {
                 },
             });
         } else {
-            libssh.addCSourceFiles(.{
+            libssh.root_module.addCSourceFiles(.{
                 .root = libssh_src,
                 .files = &.{
                     "threads/noop.c",
@@ -324,7 +324,7 @@ pub fn build(b: *std.Build) void {
             });
         }
     } else {
-        libssh.addCSourceFiles(.{
+        libssh.root_module.addCSourceFiles(.{
             .root = libssh_src,
             .files = &.{
                 "threads/noop.c",
@@ -333,7 +333,7 @@ pub fn build(b: *std.Build) void {
     }
 
     if (with_gcrypt) {
-        libssh.addCSourceFiles(.{
+        libssh.root_module.addCSourceFiles(.{
             .root = libssh_src,
             .files = &.{
                 "threads/libgcrypt.c",
@@ -352,7 +352,7 @@ pub fn build(b: *std.Build) void {
             },
         });
         if (config.HAVE_GCRYPT_CHACHA_POLY) {
-            libssh.addCSourceFiles(.{
+            libssh.root_module.addCSourceFiles(.{
                 .root = libssh_src,
                 .files = &.{
                     "external/chacha.c",
@@ -362,7 +362,7 @@ pub fn build(b: *std.Build) void {
             });
         }
     } else if (with_mbedtls) {
-        libssh.addCSourceFiles(.{
+        libssh.root_module.addCSourceFiles(.{
             .root = libssh_src,
             .files = &.{
                 "threads/mbedtls.c",
@@ -381,7 +381,7 @@ pub fn build(b: *std.Build) void {
             },
         });
         // TODO FIX MISSING HAVE_MBEDTLS_CHACHA20_H, HAVE_MBEDTLS_POLY1305_H
-        libssh.addCSourceFiles(.{
+        libssh.root_module.addCSourceFiles(.{
             .root = libssh_src,
             .files = &.{
                 "external/chacha.c",
@@ -390,7 +390,7 @@ pub fn build(b: *std.Build) void {
             },
         });
     } else {
-        libssh.addCSourceFiles(.{
+        libssh.root_module.addCSourceFiles(.{
             .root = libssh_src,
             .files = &.{
                 "threads/libcrypto.c",
@@ -403,7 +403,7 @@ pub fn build(b: *std.Build) void {
             },
         });
         if (!config.HAVE_OPENSSL_EVP_CHACHA20) {
-            libssh.addCSourceFiles(.{
+            libssh.root_module.addCSourceFiles(.{
                 .root = libssh_src,
                 .files = &.{
                     "external/chacha.c",
@@ -415,7 +415,7 @@ pub fn build(b: *std.Build) void {
     }
 
     if (with_sftp) {
-        libssh.addCSourceFiles(.{
+        libssh.root_module.addCSourceFiles(.{
             .root = libssh_src,
             .files = &.{
                 "sftp.c",
@@ -424,7 +424,7 @@ pub fn build(b: *std.Build) void {
             },
         });
         if (with_server) {
-            libssh.addCSourceFiles(.{
+            libssh.root_module.addCSourceFiles(.{
                 .root = libssh_src,
                 .files = &.{
                     "sftpserver.c",
@@ -434,7 +434,7 @@ pub fn build(b: *std.Build) void {
     }
 
     if (with_server) {
-        libssh.addCSourceFiles(.{
+        libssh.root_module.addCSourceFiles(.{
             .root = libssh_src,
             .files = &.{
                 "server.c",
@@ -445,7 +445,7 @@ pub fn build(b: *std.Build) void {
     }
 
     if (with_gex) {
-        libssh.addCSourceFiles(.{
+        libssh.root_module.addCSourceFiles(.{
             .root = libssh_src,
             .files = &.{
                 "dh-gex.c",
@@ -454,7 +454,7 @@ pub fn build(b: *std.Build) void {
     }
 
     if (with_gssapi) {
-        libssh.addCSourceFiles(.{
+        libssh.root_module.addCSourceFiles(.{
             .root = libssh_src,
             .files = &.{
                 "gssapi.c",
@@ -463,7 +463,7 @@ pub fn build(b: *std.Build) void {
     }
 
     if (!with_nacl) {
-        libssh.addCSourceFiles(.{
+        libssh.root_module.addCSourceFiles(.{
             .root = libssh_src,
             .files = &.{
                 "external/curve25519_ref.c",
@@ -482,7 +482,7 @@ pub fn build(b: *std.Build) void {
             }),
             .linkage = .static,
         });
-        common.addCSourceFiles(.{
+        common.root_module.addCSourceFiles(.{
             .root = root.path(b, "examples"),
             .files = &.{
                 "authentication.c",
@@ -490,7 +490,7 @@ pub fn build(b: *std.Build) void {
                 "connect_ssh.c",
             },
         });
-        common.linkLibrary(libssh);
+        common.root_module.linkLibrary(libssh);
         //b.installArtifact(common);
 
         const Examples = struct {
@@ -511,11 +511,11 @@ pub fn build(b: *std.Build) void {
                 });
                 const is_cpp = comptime std.mem.containsAtLeast(u8, name, 1, "hpp");
                 const path = if (is_cpp) "examples/" ++ name ++ ".cpp" else "examples/" ++ name ++ ".c";
-                exe.addCSourceFile(.{ .file = self.root.path(self.b, path) });
-                exe.linkLibrary(self.common);
-                exe.linkLibrary(self.libssh);
+                exe.root_module.addCSourceFile(.{ .file = self.root.path(self.b, path) });
+                exe.root_module.linkLibrary(self.common);
+                exe.root_module.linkLibrary(self.libssh);
                 if (is_cpp) {
-                    exe.linkLibCpp();
+                    exe.root_module.link_libcpp = true;
                 }
                 self.b.installArtifact(exe);
             }
