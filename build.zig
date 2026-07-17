@@ -152,8 +152,7 @@ pub fn build(b: *std.Build) void {
         .HAVE_LIBGCRYPT = with_gcrypt,
         .HAVE_LIBMBEDCRYPTO = with_mbedtls,
         .HAVE_MBEDTLS_CURVE25519 = with_mbedtls,
-        // TODO Threading not working with the zig built mbedtls
-        .HAVE_PTHREAD = !with_mbedtls,
+        .HAVE_PTHREAD = !is_windows,
         .HAVE_CMOCKA = unit_testing,
         .HAVE_GCC_THREAD_LOCAL_STORAGE = 0,
         .HAVE_MSC_THREAD_LOCAL_STORAGE = 0,
@@ -566,9 +565,6 @@ pub fn build(b: *std.Build) void {
         torture.root_module.linkLibrary(libssh);
         torture.root_module.link_libc = true;
         torture.root_module.linkSystemLibrary("cmocka", .{});
-        if (target.result.os.tag != .windows) {
-            torture.root_module.linkSystemLibrary("pthread", .{});
-        }
         torture.root_module.addCMacro("LIBSSH_STATIC", "1");
         torture.root_module.addCMacro("SSH_PING_EXECUTABLE", "\"ssh_ping\"");
 
@@ -584,7 +580,10 @@ pub fn build(b: *std.Build) void {
             },
         });
 
-        const unit_tests = &[_][]const u8{
+        var unit_tests: std.ArrayList([]const u8) = .empty;
+        defer unit_tests.deinit(b.allocator);
+
+        unit_tests.appendSlice(b.allocator, &.{
             "torture_bignum",
             "torture_buffer",
             "torture_bytearray",
@@ -605,11 +604,63 @@ pub fn build(b: *std.Build) void {
             "torture_session_keys",
             "torture_string",
             "torture_tokens",
-        };
+        }) catch @panic("OOM");
+
+        if (config.HAVE_PTHREAD) {
+            unit_tests.appendSlice(b.allocator, &.{
+                "torture_rand",
+                "torture_threads_init",
+                "torture_threads_buffer",
+                "torture_threads_crypto",
+            }) catch @panic("OOM");
+        }
+
+        if (is_unix) {
+            unit_tests.appendSlice(b.allocator, &.{
+                "torture_packet",
+                "torture_keyfiles",
+                "torture_pki",
+                "torture_pki_rsa",
+                "torture_pki_dsa",
+                "torture_pki_ed25519",
+                "torture_pki_sk_ed25519",
+                "torture_pki_sshsig",
+                "torture_channel",
+                "torture_pki_ecdsa",
+                "torture_pki_sk_ecdsa",
+            }) catch @panic("OOM");
+
+            if (config.HAVE_PTHREAD) {
+                unit_tests.append(b.allocator, "torture_threads_pki_rsa") catch @panic("OOM");
+            }
+
+            if (is_unix) { // HAVE_IFADDRS_H is true on Unix in config
+                unit_tests.append(b.allocator, "torture_config_match_localnetwork") catch @panic("OOM");
+            }
+
+            if (with_server) {
+                unit_tests.append(b.allocator, "torture_bind_config") catch @panic("OOM");
+                if (config.HAVE_PTHREAD) {
+                    unit_tests.appendSlice(b.allocator, &.{
+                        "torture_unit_server",
+                        "torture_server_x11",
+                        "torture_forwarded_tcpip_callback",
+                        "torture_server_direct_tcpip",
+                    }) catch @panic("OOM");
+                }
+                if (with_gex) {
+                    unit_tests.append(b.allocator, "torture_moduli") catch @panic("OOM");
+                }
+            }
+        }
+
+        if (with_sftp) {
+            unit_tests.append(b.allocator, "torture_unit_sftp") catch @panic("OOM");
+        }
 
         const test_step = b.step("test", "Run unit tests");
 
-        for (unit_tests) |name| {
+        for (unit_tests.items) |name| {
             const exe = b.addExecutable(.{
                 .name = name,
                 .root_module = b.createModule(.{
@@ -634,10 +685,6 @@ pub fn build(b: *std.Build) void {
             // is strictly intolerant of this, whereas host-standard GNU ld/linkers natively allow
             // local object overrides (matching the original CMake test build behavior).
             exe.use_lld = false;
-
-            if (target.result.os.tag != .windows) {
-                exe.root_module.linkSystemLibrary("pthread", .{});
-            }
 
             const path = b.fmt("tests/unittests/{s}.c", .{name});
             exe.root_module.addCSourceFile(.{ .file = root.path(b, path) });
