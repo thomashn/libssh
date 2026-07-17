@@ -1,4 +1,7 @@
 # libssh
+[![Zig Version](https://img.shields.io/badge/Zig-0.16.0-orange.svg?logo=zig)](https://ziglang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 This is [libssh](https://www.libssh.org/),
 packaged for [Zig](https://ziglang.org/).
 
