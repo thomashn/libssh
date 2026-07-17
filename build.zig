@@ -85,7 +85,7 @@ pub fn build(b: *std.Build) void {
         .PROJECT_VERSION = version,
         .SYSCONFDIR = "TODO",
         .BINARYDIR = "TODO",
-        .SOURCEDIR = "TODO",
+        .SOURCEDIR = root.getPath(b),
         .USR_GLOBAL_BIND_CONFIG = "TODO",
         .GLOBAL_BIND_CONFIG = "/etc/ssh/libssh_server_config",
         .USR_GLOBAL_CLIENT_CONFIG = "TODO",
@@ -93,7 +93,7 @@ pub fn build(b: *std.Build) void {
         .HAVE_ARGP_H = have_argp,
         .HAVE_ARPA_INET_H = is_unix,
         .HAVE_GLOB_H = is_unix,
-        .HAVE_VALGRIND_VALGRIND_H = unit_testing,
+        .HAVE_VALGRIND_VALGRIND_H = false,
         .HAVE_PTY_H = have_pty,
         .HAVE_UTMP_H = 1,
         .HAVE_UTIL_H = target.result.os.tag == .macos,
@@ -177,7 +177,10 @@ pub fn build(b: *std.Build) void {
         .WITH_NACL = with_nacl,
         .WITH_PKCS11_URI = with_pkcs11_uri,
         .WITH_PKCS11_PROVIDER = with_pkcs11_provider,
-        .WORDS_BIGENDIAN = 1,
+        .WORDS_BIGENDIAN = if (target.result.cpu.arch.endian() == .big) @as(u32, 1) else @as(u32, 0),
+        .HAVE_OPENSSL_MLKEM = false,
+        .HAVE_GCRYPT_MLKEM = false,
+        .HAVE_MLKEM1024 = false,
     };
 
     const config_header = b.addConfigHeader(.{
@@ -472,6 +475,135 @@ pub fn build(b: *std.Build) void {
     }
 
     b.installArtifact(libssh);
+
+    if (unit_testing) {
+        const tests_config = .{
+            .OPENSSH_VERSION_MAJOR = @as(?[]const u8, null),
+            .OPENSSH_VERSION_MINOR = @as(?[]const u8, null),
+            .OPENSSH_SUPPORTS_SSHSIG = @as(?[]const u8, null),
+            .OPENSSH_CIPHERS = "",
+            .OPENSSH_MACS = "",
+            .OPENSSH_KEX = "",
+            .OPENSSH_KEYS = "",
+            .NCAT_EXECUTABLE = "",
+            .SSHD_EXECUTABLE = "",
+            .SSH_EXECUTABLE = "",
+            .SSH_EXECUTABLE_SIZE = @as(?[]const u8, null),
+            .SSH_KEYGEN_EXECUTABLE = "",
+            .DROPBEAR_EXECUTABLE = "",
+            .PUTTY_EXECUTABLE = "",
+            .PUTTYGEN_EXECUTABLE = "",
+            .WITH_TIMEOUT = @as(?[]const u8, null),
+            .TIMEOUT_EXECUTABLE = "",
+            .SOFTHSM2_LIBRARY = "",
+            .PKCS11SPY = "",
+            .SK_DUMMY_LIBRARY_PATH = "",
+        };
+
+        const tests_config_header = b.addConfigHeader(.{
+            .style = .{
+                .cmake = root.path(b, "tests/tests_config.h.cmake"),
+            },
+            .include_path = "tests_config.h",
+        }, tests_config);
+
+        const torture = b.addLibrary(.{
+            .name = "torture",
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+            }),
+            .linkage = .static,
+        });
+        torture.root_module.addConfigHeader(config_header);
+        torture.root_module.addConfigHeader(version_header);
+        torture.root_module.addConfigHeader(tests_config_header);
+        torture.root_module.addIncludePath(root.path(b, "include"));
+        torture.root_module.addIncludePath(root.path(b, "tests"));
+        torture.root_module.addIncludePath(root.path(b, "src"));
+        torture.root_module.linkLibrary(libssh);
+        torture.root_module.link_libc = true;
+        torture.root_module.linkSystemLibrary("cmocka", .{});
+        if (target.result.os.tag != .windows) {
+            torture.root_module.linkSystemLibrary("pthread", .{});
+        }
+        torture.root_module.addCMacro("LIBSSH_STATIC", "1");
+        torture.root_module.addCMacro("SSH_PING_EXECUTABLE", "\"ssh_ping\"");
+
+        torture.root_module.addCSourceFiles(.{
+            .root = root.path(b, "tests"),
+            .files = &.{
+                "cmdline.c",
+                "torture.c",
+                "torture_key.c",
+                "torture_pki.c",
+                "torture_sk.c",
+                "torture_cmocka.c",
+            },
+        });
+
+        const unit_tests = &[_][]const u8{
+            "torture_bignum",
+            "torture_buffer",
+            "torture_bytearray",
+            "torture_callbacks",
+            "torture_crypto",
+            "torture_init",
+            "torture_list",
+            "torture_misc",
+            "torture_config",
+            "torture_options",
+            "torture_isipaddr",
+            "torture_knownhosts_parsing",
+            "torture_hashes",
+            "torture_packet_filter",
+            "torture_temp_dir",
+            "torture_temp_file",
+            "torture_push_pop_dir",
+            "torture_session_keys",
+            "torture_string",
+            "torture_tokens",
+        };
+
+        const test_step = b.step("test", "Run unit tests");
+
+        for (unit_tests) |name| {
+            const exe = b.addExecutable(.{
+                .name = name,
+                .root_module = b.createModule(.{
+                    .target = target,
+                    .optimize = optimize,
+                }),
+            });
+            exe.root_module.addConfigHeader(config_header);
+            exe.root_module.addConfigHeader(version_header);
+            exe.root_module.addConfigHeader(tests_config_header);
+            exe.root_module.addIncludePath(root.path(b, "include"));
+            exe.root_module.addIncludePath(root.path(b, "tests"));
+            exe.root_module.addIncludePath(root.path(b, "src"));
+
+            exe.root_module.linkLibrary(libssh);
+            exe.root_module.linkLibrary(torture);
+            exe.root_module.linkSystemLibrary("cmocka", .{});
+            exe.root_module.link_libc = true;
+
+            // Many unit tests directly `#include "some_file.c"` to test internal static functions,
+            // which creates duplicate symbol conflicts with the built libssh archive. LLVM's LLD
+            // is strictly intolerant of this, whereas host-standard GNU ld/linkers natively allow
+            // local object overrides (matching the original CMake test build behavior).
+            exe.use_lld = false;
+
+            if (target.result.os.tag != .windows) {
+                exe.root_module.linkSystemLibrary("pthread", .{});
+            }
+
+            const path = b.fmt("tests/unittests/{s}.c", .{name});
+            exe.root_module.addCSourceFile(.{ .file = root.path(b, path) });
+
+            const run = b.addRunArtifact(exe);
+            test_step.dependOn(&run.step);
+        }
+    }
 
     if (with_examples) {
         const common = b.addLibrary(.{
