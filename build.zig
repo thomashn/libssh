@@ -1,8 +1,8 @@
 const std = @import("std");
 
 const major = 0;
-const minor = 11;
-const patch = 3;
+const minor = 12;
+const patch = 0;
 const version = std.fmt.comptimePrint("{}.{}.{}", .{ major, minor, patch });
 
 pub fn build(b: *std.Build) void {
@@ -87,6 +87,8 @@ pub fn build(b: *std.Build) void {
         .BINARYDIR = "TODO",
         .SOURCEDIR = root.getPath(b),
         .USR_GLOBAL_BIND_CONFIG = "TODO",
+        .USR_GLOBAL_CONF_DIR = "TODO",
+        .GLOBAL_CONF_DIR = "TODO",
         .GLOBAL_BIND_CONFIG = "/etc/ssh/libssh_server_config",
         .USR_GLOBAL_CLIENT_CONFIG = "TODO",
         .GLOBAL_CLIENT_CONFIG = "/etc/ssh/ssh_config",
@@ -141,6 +143,7 @@ pub fn build(b: *std.Build) void {
         .HAVE__STRTOUI64 = 1,
         .HAVE_GLOB = is_unix,
         .HAVE_EXPLICIT_BZERO = target.result.os.tag == .linux,
+        .HAVE_MEMSET_EXPLICIT = false,
         .HAVE_MEMSET_S = is_unix,
         .HAVE_SECURE_ZERO_MEMORY = 1,
         .HAVE_CMOCKA_SET_TEST_FILTER = unit_testing,
@@ -148,6 +151,7 @@ pub fn build(b: *std.Build) void {
         .HAVE_LIBCRYPTO = with_openssl,
         .HAVE_LIBGCRYPT = with_gcrypt,
         .HAVE_LIBMBEDCRYPTO = with_mbedtls,
+        .HAVE_MBEDTLS_CURVE25519 = with_mbedtls,
         // TODO Threading not working with the zig built mbedtls
         .HAVE_PTHREAD = !with_mbedtls,
         .HAVE_CMOCKA = unit_testing,
@@ -233,9 +237,12 @@ pub fn build(b: *std.Build) void {
         const mbedtls = b.dependency("mbedtls", .{
             .target = target,
             .optimize = optimize,
+            .threading = true,
         });
         libssh.root_module.linkLibrary(mbedtls.artifact("mbedtls"));
         libssh.installLibraryHeaders(mbedtls.artifact("mbedtls"));
+        libssh.root_module.addCMacro("MBEDTLS_THREADING_C", "1");
+        libssh.root_module.addCMacro("MBEDTLS_THREADING_PTHREAD", "1");
     }
 
     if (with_openssl) {
@@ -270,11 +277,13 @@ pub fn build(b: *std.Build) void {
             "connector.c",
             "crypto_common.c",
             "curve25519.c",
+            "sntrup761.c",
             "dh.c",
             "ecdh.c",
             "error.c",
             "getpass.c",
             "gzip.c",
+            "hybrid_mlkem.c",
             "init.c",
             "kdf.c",
             "kex.c",
@@ -285,12 +294,14 @@ pub fn build(b: *std.Build) void {
             "match.c",
             "messages.c",
             "misc.c",
+            "mlkem.c",
             "options.c",
             "packet.c",
             "packet_cb.c",
             "packet_crypt.c",
             "pcap.c",
             "pki.c",
+            "pki_context.c",
             "pki_container_openssh.c",
             "poll.c",
             "session.c",
@@ -352,6 +363,7 @@ pub fn build(b: *std.Build) void {
                 "external/fe25519.c",
                 "external/ge25519.c",
                 "external/sc25519.c",
+                "external/sntrup761.c",
             },
         });
         if (config.HAVE_GCRYPT_CHACHA_POLY) {
@@ -364,6 +376,14 @@ pub fn build(b: *std.Build) void {
                 },
             });
         }
+        if (config.HAVE_GCRYPT_MLKEM) {
+            libssh.root_module.addCSourceFiles(.{
+                .root = libssh_src,
+                .files = &.{
+                    "mlkem_gcrypt.c",
+                },
+            });
+        }
     } else if (with_mbedtls) {
         libssh.root_module.addCSourceFiles(.{
             .root = libssh_src,
@@ -373,6 +393,7 @@ pub fn build(b: *std.Build) void {
                 "mbedcrypto_missing.c",
                 "pki_mbedcrypto.c",
                 "ecdh_mbedcrypto.c",
+                "curve25519_mbedcrypto.c",
                 "getrandom_mbedcrypto.c",
                 "md_mbedcrypto.c",
                 "dh_key.c",
@@ -381,6 +402,7 @@ pub fn build(b: *std.Build) void {
                 "external/fe25519.c",
                 "external/ge25519.c",
                 "external/sc25519.c",
+                "external/sntrup761.c",
             },
         });
         // TODO FIX MISSING HAVE_MBEDTLS_CHACHA20_H, HAVE_MBEDTLS_POLY1305_H
@@ -399,10 +421,12 @@ pub fn build(b: *std.Build) void {
                 "threads/libcrypto.c",
                 "pki_crypto.c",
                 "ecdh_crypto.c",
+                "curve25519_crypto.c",
                 "getrandom_crypto.c",
                 "md_crypto.c",
                 "libcrypto.c",
                 "dh_crypto.c",
+                "external/sntrup761.c",
             },
         });
         if (!config.HAVE_OPENSSL_EVP_CHACHA20) {
@@ -412,6 +436,14 @@ pub fn build(b: *std.Build) void {
                     "external/chacha.c",
                     "external/poly1305.c",
                     "chachapoly.c",
+                },
+            });
+        }
+        if (config.HAVE_OPENSSL_MLKEM) {
+            libssh.root_module.addCSourceFiles(.{
+                .root = libssh_src,
+                .files = &.{
+                    "mlkem_crypto.c",
                 },
             });
         }
@@ -470,6 +502,16 @@ pub fn build(b: *std.Build) void {
             .root = libssh_src,
             .files = &.{
                 "external/curve25519_ref.c",
+            },
+        });
+    }
+
+    if (!config.HAVE_MLKEM1024) {
+        libssh.root_module.addCSourceFiles(.{
+            .root = libssh_src,
+            .files = &.{
+                "mlkem_native.c",
+                "external/libcrux_mlkem768_sha3.c",
             },
         });
     }

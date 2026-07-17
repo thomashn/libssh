@@ -1,16 +1,16 @@
 .{
     .name = .libssh,
-    .version = "0.11.3",
+    .version = "0.12.0",
     .fingerprint = 0xda355160da7dff73,
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .libssh = .{
-            .url = "git+https://gitlab.com/libssh/libssh-mirror.git?ref=libssh-0.11.3#301d0e16dfa8a5cac1cff956b6880ca90eb82864",
-            .hash = "N-V-__8AAJ4jTQDM7VOkAl1kkGkbqhjOUPN_-RgeAcBYF9Np",
+            .url = "git+https://gitlab.com/libssh/libssh-mirror.git?ref=libssh-0.12.0#50313883f3a077458cde4ea95bf46bfeb0771b34",
+            .hash = "N-V-__8AAJQ3YACvCqTRvZk5i48MCnXp0JPImYjVIjw_fEG2",
         },
         .mbedtls = .{
-            .url = "git+https://github.com/allyourcodebase/mbedtls#68d5872dca0faa3e2a09d3329c73bd8779cc34e6",
-            .hash = "mbedtls-3.6.4-E4NUR24VAADBF5pt-No-Z90DjozkzySYAgq6eDFy9Xdy",
+            .url = "git+https://github.com/allyourcodebase/mbedtls.git#3aa71a19acc173ae57b6a1114d62f2fdfd22960c",
+            .hash = "mbedtls-3.6.4-E4NUR2wWAAAUSvVbho9aaU31-e4D8glu9l1VfxKezBkV",
         },
         .zlib = .{
             .url = "git+https://github.com/allyourcodebase/zlib.git#d3b5519d3b73616a6bfece0712f080029d2a9244",
