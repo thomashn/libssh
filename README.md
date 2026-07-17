@@ -17,6 +17,9 @@ Next, add this snippet to your `build.zig` script:
 const libssh_dep = b.dependency("libssh", .{
     .target = target,
     .optimize = optimize,
+    // mbedtls is preferred because it supports seamless cross-compilation
+    // across all platforms natively, avoiding OpenSSL's build limits on non-Linux hosts.
+    .mbedtls = true,
 });
 your_compilation.linkLibrary(libssh_dep.artifact("libssh"));
 ```
