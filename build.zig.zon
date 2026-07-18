@@ -20,6 +20,10 @@
             .url = "git+https://github.com/allyourcodebase/openssl.git#6b318b447c8ff7529e3a2337a1df2a9b4816fee2",
             .hash = "openssl-3.3.2-TC9C3Ze3ZABaKR5hc8KRnRPhTClKrKQKqTnXTUYkvmSR",
         },
+        .cmocka = .{
+            .url = "git+https://github.com/thomashn/cmocka.git#fa9bb437d366098eb4b212d74e7c15e66fb284d9",
+            .hash = "cmocka-2.0.2-I28SclsqAADWrJphRXtokWRdokJSclQjL08wZhbLFn2P",
+        },
     },
     .paths = .{
         "LICENSE",

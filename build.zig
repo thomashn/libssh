@@ -518,6 +518,11 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(libssh);
 
     if (unit_testing) {
+        const cmocka = b.dependency("cmocka", .{
+            .target = target,
+            .optimize = optimize,
+        });
+
         const tests_config = .{
             .OPENSSH_VERSION_MAJOR = @as(?[]const u8, null),
             .OPENSSH_VERSION_MINOR = @as(?[]const u8, null),
@@ -564,7 +569,7 @@ pub fn build(b: *std.Build) void {
         torture.root_module.addIncludePath(root.path(b, "src"));
         torture.root_module.linkLibrary(libssh);
         torture.root_module.link_libc = true;
-        torture.root_module.linkSystemLibrary("cmocka", .{});
+        torture.root_module.linkLibrary(cmocka.artifact("cmocka"));
         torture.root_module.addCMacro("LIBSSH_STATIC", "1");
         torture.root_module.addCMacro("SSH_PING_EXECUTABLE", "\"ssh_ping\"");
 
@@ -677,7 +682,7 @@ pub fn build(b: *std.Build) void {
 
             exe.root_module.linkLibrary(libssh);
             exe.root_module.linkLibrary(torture);
-            exe.root_module.linkSystemLibrary("cmocka", .{});
+            exe.root_module.linkLibrary(cmocka.artifact("cmocka"));
             exe.root_module.link_libc = true;
 
             // Many unit tests directly `#include "some_file.c"` to test internal static functions,
