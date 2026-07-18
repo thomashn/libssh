@@ -21,8 +21,8 @@
             .hash = "openssl-3.3.2-TC9C3Ze3ZABaKR5hc8KRnRPhTClKrKQKqTnXTUYkvmSR",
         },
         .cmocka = .{
-            .url = "git+https://github.com/thomashn/cmocka.git#fa9bb437d366098eb4b212d74e7c15e66fb284d9",
-            .hash = "cmocka-2.0.2-I28SclsqAADWrJphRXtokWRdokJSclQjL08wZhbLFn2P",
+            .url = "git+https://github.com/thomashn/cmocka.git#4b1c190185f89a16d2d2130c14c31bfd02c62025",
+            .hash = "cmocka-2.0.2-I28Scp4qAAD3hUZP5OleO7rvG5Ln04Qzk7KPuHxoV0EW",
         },
     },
     .paths = .{

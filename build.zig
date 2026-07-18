@@ -80,12 +80,23 @@ pub fn build(b: *std.Build) void {
         enable_exec = !is_windows;
     }
 
+    var source_dir = root.getPath(b);
+    if (is_windows) {
+        const dupe_path = b.allocator.dupe(u8, source_dir) catch @panic("OOM");
+        for (dupe_path) |*char| {
+            if (char.* == '\\') {
+                char.* = '/';
+            }
+        }
+        source_dir = dupe_path;
+    }
+
     const config = .{
         .PROJECT_NAME = "libssh",
         .PROJECT_VERSION = version,
         .SYSCONFDIR = "TODO",
         .BINARYDIR = "TODO",
-        .SOURCEDIR = root.getPath(b),
+        .SOURCEDIR = source_dir,
         .USR_GLOBAL_BIND_CONFIG = "TODO",
         .USR_GLOBAL_CONF_DIR = "TODO",
         .GLOBAL_CONF_DIR = "TODO",
@@ -209,6 +220,8 @@ pub fn build(b: *std.Build) void {
 
     if (is_windows) {
         libssh.root_module.addCMacro("_WIN32", "1");
+        libssh.root_module.linkSystemLibrary("ws2_32", .{});
+        libssh.root_module.linkSystemLibrary("iphlpapi", .{});
     }
     libssh.root_module.addCMacro("LIBSSH_STATIC", "1");
 
@@ -318,7 +331,15 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    if (config.HAVE_PTHREAD) {
+    if (is_windows) {
+        libssh.root_module.addCSourceFiles(.{
+            .root = libssh_src,
+            .files = &.{
+                "threads/noop.c",
+                "threads/winlocks.c",
+            },
+        });
+    } else if (config.HAVE_PTHREAD) {
         if (target.result.os.tag == .linux or target.result.os.tag == .macos) {
             libssh.root_module.addCSourceFiles(.{
                 .root = libssh_src,
@@ -689,7 +710,9 @@ pub fn build(b: *std.Build) void {
             // which creates duplicate symbol conflicts with the built libssh archive. LLVM's LLD
             // is strictly intolerant of this, whereas host-standard GNU ld/linkers natively allow
             // local object overrides (matching the original CMake test build behavior).
-            exe.use_lld = false;
+            if (!is_windows) {
+                exe.use_lld = false;
+            }
 
             const path = b.fmt("tests/unittests/{s}.c", .{name});
             exe.root_module.addCSourceFile(.{ .file = root.path(b, path) });
