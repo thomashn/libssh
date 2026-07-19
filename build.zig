@@ -23,7 +23,6 @@ pub fn build(b: *std.Build) void {
     const with_internal_doc = b.option(bool, "internal_doc", "Compile doxygen internal documentation") orelse false;
     const with_pkcs11_uri = b.option(bool, "pkcs11_uri", "Build with PKCS#11 support") orelse false;
     const with_pkcs11_provider = b.option(bool, "pkcs11_provider", "Use the PKCS#11 provider for accessing pkcs11 objects") orelse false;
-    const unit_testing = b.option(bool, "unit_testing", "Build with unit tests") orelse false;
     const client_testing = b.option(bool, "client_testing", "Build with client tests; requires openssh") orelse false;
     const server_testing = b.option(bool, "server_testing", "Build with server tests; requires openssh and dropbear") orelse false;
     const gssapi_testing = b.option(bool, "gssapi_testing", "Build with GSSAPI tests; requires krb5-server,krb5-libs and krb5-workstation") orelse false;
@@ -157,14 +156,14 @@ pub fn build(b: *std.Build) void {
         .HAVE_MEMSET_EXPLICIT = false,
         .HAVE_MEMSET_S = is_unix,
         .HAVE_SECURE_ZERO_MEMORY = 1,
-        .HAVE_CMOCKA_SET_TEST_FILTER = unit_testing,
+        .HAVE_CMOCKA_SET_TEST_FILTER = 1,
         .HAVE_BLOWFISH = with_blowfish_cipher,
         .HAVE_LIBCRYPTO = with_openssl,
         .HAVE_LIBGCRYPT = with_gcrypt,
         .HAVE_LIBMBEDCRYPTO = with_mbedtls,
         .HAVE_MBEDTLS_CURVE25519 = with_mbedtls,
         .HAVE_PTHREAD = !is_windows,
-        .HAVE_CMOCKA = unit_testing,
+        .HAVE_CMOCKA = 1,
         .HAVE_GCC_THREAD_LOCAL_STORAGE = 0,
         .HAVE_MSC_THREAD_LOCAL_STORAGE = 0,
         .HAVE_FALLTHROUGH_ATTRIBUTE = 1,
@@ -538,188 +537,186 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(libssh);
 
-    if (unit_testing) {
-        const cmocka = b.dependency("cmocka", .{
+    const cmocka = b.dependency("cmocka", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const tests_config = .{
+        .OPENSSH_VERSION_MAJOR = @as(?[]const u8, null),
+        .OPENSSH_VERSION_MINOR = @as(?[]const u8, null),
+        .OPENSSH_SUPPORTS_SSHSIG = @as(?[]const u8, null),
+        .OPENSSH_CIPHERS = "",
+        .OPENSSH_MACS = "",
+        .OPENSSH_KEX = "",
+        .OPENSSH_KEYS = "",
+        .NCAT_EXECUTABLE = "",
+        .SSHD_EXECUTABLE = "",
+        .SSH_EXECUTABLE = "",
+        .SSH_EXECUTABLE_SIZE = @as(?[]const u8, null),
+        .SSH_KEYGEN_EXECUTABLE = "",
+        .DROPBEAR_EXECUTABLE = "",
+        .PUTTY_EXECUTABLE = "",
+        .PUTTYGEN_EXECUTABLE = "",
+        .WITH_TIMEOUT = @as(?[]const u8, null),
+        .TIMEOUT_EXECUTABLE = "",
+        .SOFTHSM2_LIBRARY = "",
+        .PKCS11SPY = "",
+        .SK_DUMMY_LIBRARY_PATH = "",
+    };
+
+    const tests_config_header = b.addConfigHeader(.{
+        .style = .{
+            .cmake = root.path(b, "tests/tests_config.h.cmake"),
+        },
+        .include_path = "tests_config.h",
+    }, tests_config);
+
+    const torture = b.addLibrary(.{
+        .name = "torture",
+        .root_module = b.createModule(.{
             .target = target,
             .optimize = optimize,
-        });
+        }),
+        .linkage = .static,
+    });
+    torture.root_module.addConfigHeader(config_header);
+    torture.root_module.addConfigHeader(version_header);
+    torture.root_module.addConfigHeader(tests_config_header);
+    torture.root_module.addIncludePath(root.path(b, "include"));
+    torture.root_module.addIncludePath(root.path(b, "tests"));
+    torture.root_module.addIncludePath(root.path(b, "src"));
+    torture.root_module.linkLibrary(libssh);
+    torture.root_module.link_libc = true;
+    torture.root_module.linkLibrary(cmocka.artifact("cmocka"));
+    torture.root_module.addCMacro("LIBSSH_STATIC", "1");
+    torture.root_module.addCMacro("SSH_PING_EXECUTABLE", "\"ssh_ping\"");
 
-        const tests_config = .{
-            .OPENSSH_VERSION_MAJOR = @as(?[]const u8, null),
-            .OPENSSH_VERSION_MINOR = @as(?[]const u8, null),
-            .OPENSSH_SUPPORTS_SSHSIG = @as(?[]const u8, null),
-            .OPENSSH_CIPHERS = "",
-            .OPENSSH_MACS = "",
-            .OPENSSH_KEX = "",
-            .OPENSSH_KEYS = "",
-            .NCAT_EXECUTABLE = "",
-            .SSHD_EXECUTABLE = "",
-            .SSH_EXECUTABLE = "",
-            .SSH_EXECUTABLE_SIZE = @as(?[]const u8, null),
-            .SSH_KEYGEN_EXECUTABLE = "",
-            .DROPBEAR_EXECUTABLE = "",
-            .PUTTY_EXECUTABLE = "",
-            .PUTTYGEN_EXECUTABLE = "",
-            .WITH_TIMEOUT = @as(?[]const u8, null),
-            .TIMEOUT_EXECUTABLE = "",
-            .SOFTHSM2_LIBRARY = "",
-            .PKCS11SPY = "",
-            .SK_DUMMY_LIBRARY_PATH = "",
-        };
+    torture.root_module.addCSourceFiles(.{
+        .root = root.path(b, "tests"),
+        .files = &.{
+            "cmdline.c",
+            "torture.c",
+            "torture_key.c",
+            "torture_pki.c",
+            "torture_sk.c",
+            "torture_cmocka.c",
+        },
+    });
 
-        const tests_config_header = b.addConfigHeader(.{
-            .style = .{
-                .cmake = root.path(b, "tests/tests_config.h.cmake"),
-            },
-            .include_path = "tests_config.h",
-        }, tests_config);
+    var unit_tests: std.ArrayList([]const u8) = .empty;
+    defer unit_tests.deinit(b.allocator);
 
-        const torture = b.addLibrary(.{
-            .name = "torture",
+    unit_tests.appendSlice(b.allocator, &.{
+        "torture_bignum",
+        "torture_buffer",
+        "torture_bytearray",
+        "torture_callbacks",
+        "torture_crypto",
+        "torture_init",
+        "torture_list",
+        "torture_misc",
+        "torture_config",
+        "torture_options",
+        "torture_isipaddr",
+        "torture_knownhosts_parsing",
+        "torture_hashes",
+        "torture_packet_filter",
+        "torture_temp_dir",
+        "torture_temp_file",
+        "torture_push_pop_dir",
+        "torture_session_keys",
+        "torture_string",
+        "torture_tokens",
+    }) catch @panic("OOM");
+
+    if (config.HAVE_PTHREAD) {
+        unit_tests.appendSlice(b.allocator, &.{
+            "torture_rand",
+            "torture_threads_init",
+            "torture_threads_buffer",
+            "torture_threads_crypto",
+        }) catch @panic("OOM");
+    }
+
+    if (is_unix) {
+        unit_tests.appendSlice(b.allocator, &.{
+            "torture_packet",
+            "torture_keyfiles",
+            "torture_pki",
+            "torture_pki_rsa",
+            "torture_pki_dsa",
+            "torture_pki_ed25519",
+            "torture_pki_sk_ed25519",
+            "torture_pki_sshsig",
+            "torture_channel",
+            "torture_pki_ecdsa",
+            "torture_pki_sk_ecdsa",
+        }) catch @panic("OOM");
+
+        if (config.HAVE_PTHREAD) {
+            unit_tests.append(b.allocator, "torture_threads_pki_rsa") catch @panic("OOM");
+        }
+
+        if (is_unix) { // HAVE_IFADDRS_H is true on Unix in config
+            unit_tests.append(b.allocator, "torture_config_match_localnetwork") catch @panic("OOM");
+        }
+
+        if (with_server) {
+            unit_tests.append(b.allocator, "torture_bind_config") catch @panic("OOM");
+            if (config.HAVE_PTHREAD) {
+                unit_tests.appendSlice(b.allocator, &.{
+                    "torture_unit_server",
+                    "torture_server_x11",
+                    "torture_forwarded_tcpip_callback",
+                    "torture_server_direct_tcpip",
+                }) catch @panic("OOM");
+            }
+            if (with_gex) {
+                unit_tests.append(b.allocator, "torture_moduli") catch @panic("OOM");
+            }
+        }
+    }
+
+    if (with_sftp) {
+        unit_tests.append(b.allocator, "torture_unit_sftp") catch @panic("OOM");
+    }
+
+    const test_step = b.step("test", "Run unit tests");
+
+    for (unit_tests.items) |name| {
+        const exe = b.addExecutable(.{
+            .name = name,
             .root_module = b.createModule(.{
                 .target = target,
                 .optimize = optimize,
             }),
-            .linkage = .static,
         });
-        torture.root_module.addConfigHeader(config_header);
-        torture.root_module.addConfigHeader(version_header);
-        torture.root_module.addConfigHeader(tests_config_header);
-        torture.root_module.addIncludePath(root.path(b, "include"));
-        torture.root_module.addIncludePath(root.path(b, "tests"));
-        torture.root_module.addIncludePath(root.path(b, "src"));
-        torture.root_module.linkLibrary(libssh);
-        torture.root_module.link_libc = true;
-        torture.root_module.linkLibrary(cmocka.artifact("cmocka"));
-        torture.root_module.addCMacro("LIBSSH_STATIC", "1");
-        torture.root_module.addCMacro("SSH_PING_EXECUTABLE", "\"ssh_ping\"");
+        exe.root_module.addConfigHeader(config_header);
+        exe.root_module.addConfigHeader(version_header);
+        exe.root_module.addConfigHeader(tests_config_header);
+        exe.root_module.addIncludePath(root.path(b, "include"));
+        exe.root_module.addIncludePath(root.path(b, "tests"));
+        exe.root_module.addIncludePath(root.path(b, "src"));
 
-        torture.root_module.addCSourceFiles(.{
-            .root = root.path(b, "tests"),
-            .files = &.{
-                "cmdline.c",
-                "torture.c",
-                "torture_key.c",
-                "torture_pki.c",
-                "torture_sk.c",
-                "torture_cmocka.c",
-            },
-        });
+        exe.root_module.linkLibrary(libssh);
+        exe.root_module.linkLibrary(torture);
+        exe.root_module.linkLibrary(cmocka.artifact("cmocka"));
+        exe.root_module.link_libc = true;
 
-        var unit_tests: std.ArrayList([]const u8) = .empty;
-        defer unit_tests.deinit(b.allocator);
-
-        unit_tests.appendSlice(b.allocator, &.{
-            "torture_bignum",
-            "torture_buffer",
-            "torture_bytearray",
-            "torture_callbacks",
-            "torture_crypto",
-            "torture_init",
-            "torture_list",
-            "torture_misc",
-            "torture_config",
-            "torture_options",
-            "torture_isipaddr",
-            "torture_knownhosts_parsing",
-            "torture_hashes",
-            "torture_packet_filter",
-            "torture_temp_dir",
-            "torture_temp_file",
-            "torture_push_pop_dir",
-            "torture_session_keys",
-            "torture_string",
-            "torture_tokens",
-        }) catch @panic("OOM");
-
-        if (config.HAVE_PTHREAD) {
-            unit_tests.appendSlice(b.allocator, &.{
-                "torture_rand",
-                "torture_threads_init",
-                "torture_threads_buffer",
-                "torture_threads_crypto",
-            }) catch @panic("OOM");
+        // Many unit tests directly `#include "some_file.c"` to test internal static functions,
+        // which creates duplicate symbol conflicts with the built libssh archive. LLVM's LLD
+        // is strictly intolerant of this, whereas host-standard GNU ld/linkers natively allow
+        // local object overrides (matching the original CMake test build behavior).
+        if (!is_windows) {
+            exe.use_lld = false;
         }
 
-        if (is_unix) {
-            unit_tests.appendSlice(b.allocator, &.{
-                "torture_packet",
-                "torture_keyfiles",
-                "torture_pki",
-                "torture_pki_rsa",
-                "torture_pki_dsa",
-                "torture_pki_ed25519",
-                "torture_pki_sk_ed25519",
-                "torture_pki_sshsig",
-                "torture_channel",
-                "torture_pki_ecdsa",
-                "torture_pki_sk_ecdsa",
-            }) catch @panic("OOM");
+        const path = b.fmt("tests/unittests/{s}.c", .{name});
+        exe.root_module.addCSourceFile(.{ .file = root.path(b, path) });
 
-            if (config.HAVE_PTHREAD) {
-                unit_tests.append(b.allocator, "torture_threads_pki_rsa") catch @panic("OOM");
-            }
-
-            if (is_unix) { // HAVE_IFADDRS_H is true on Unix in config
-                unit_tests.append(b.allocator, "torture_config_match_localnetwork") catch @panic("OOM");
-            }
-
-            if (with_server) {
-                unit_tests.append(b.allocator, "torture_bind_config") catch @panic("OOM");
-                if (config.HAVE_PTHREAD) {
-                    unit_tests.appendSlice(b.allocator, &.{
-                        "torture_unit_server",
-                        "torture_server_x11",
-                        "torture_forwarded_tcpip_callback",
-                        "torture_server_direct_tcpip",
-                    }) catch @panic("OOM");
-                }
-                if (with_gex) {
-                    unit_tests.append(b.allocator, "torture_moduli") catch @panic("OOM");
-                }
-            }
-        }
-
-        if (with_sftp) {
-            unit_tests.append(b.allocator, "torture_unit_sftp") catch @panic("OOM");
-        }
-
-        const test_step = b.step("test", "Run unit tests");
-
-        for (unit_tests.items) |name| {
-            const exe = b.addExecutable(.{
-                .name = name,
-                .root_module = b.createModule(.{
-                    .target = target,
-                    .optimize = optimize,
-                }),
-            });
-            exe.root_module.addConfigHeader(config_header);
-            exe.root_module.addConfigHeader(version_header);
-            exe.root_module.addConfigHeader(tests_config_header);
-            exe.root_module.addIncludePath(root.path(b, "include"));
-            exe.root_module.addIncludePath(root.path(b, "tests"));
-            exe.root_module.addIncludePath(root.path(b, "src"));
-
-            exe.root_module.linkLibrary(libssh);
-            exe.root_module.linkLibrary(torture);
-            exe.root_module.linkLibrary(cmocka.artifact("cmocka"));
-            exe.root_module.link_libc = true;
-
-            // Many unit tests directly `#include "some_file.c"` to test internal static functions,
-            // which creates duplicate symbol conflicts with the built libssh archive. LLVM's LLD
-            // is strictly intolerant of this, whereas host-standard GNU ld/linkers natively allow
-            // local object overrides (matching the original CMake test build behavior).
-            if (!is_windows) {
-                exe.use_lld = false;
-            }
-
-            const path = b.fmt("tests/unittests/{s}.c", .{name});
-            exe.root_module.addCSourceFile(.{ .file = root.path(b, path) });
-
-            const run = b.addRunArtifact(exe);
-            test_step.dependOn(&run.step);
-        }
+        const run = b.addRunArtifact(exe);
+        test_step.dependOn(&run.step);
     }
 
     if (with_examples) {

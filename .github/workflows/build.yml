@@ -17,7 +17,7 @@ jobs:
         with:
           zig-version: 0.16.0
       - name: Build
-        run: zig build test -Dexamples -Dunit_testing=true -Dmbedtls=true
+        run: zig build test -Dexamples -Dmbedtls=true
   build_mac:
     runs-on: macos-latest
     steps:
@@ -26,7 +26,7 @@ jobs:
         with:
           zig-version: 0.16.0
       - name: Build
-        run: zig build test -Dexamples -Dunit_testing=true -Dmbedtls=true
+        run: zig build test -Dexamples -Dmbedtls=true
   build_windows:
     runs-on: windows-latest
     steps:
@@ -35,4 +35,4 @@ jobs:
         with:
           zig-version: 0.16.0
       - name: Build
-        run: zig build test -Dexamples -Dunit_testing=true -Dmbedtls=true
+        run: zig build test -Dexamples -Dmbedtls=true
