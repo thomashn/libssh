@@ -2,7 +2,7 @@
     .name = .libssh,
     .version = "0.12.0",
     .fingerprint = 0xda355160da7dff73,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .libssh = .{
             .url = "git+https://gitlab.com/libssh/libssh-mirror.git?ref=libssh-0.12.0#50313883f3a077458cde4ea95bf46bfeb0771b34",
@@ -21,8 +21,8 @@
             .hash = "openssl-3.3.2-TC9C3Ze3ZABaKR5hc8KRnRPhTClKrKQKqTnXTUYkvmSR",
         },
         .cmocka = .{
-            .url = "git+https://github.com/thomashn/cmocka.git#4b1c190185f89a16d2d2130c14c31bfd02c62025",
-            .hash = "cmocka-2.0.2-I28Scp4qAAD3hUZP5OleO7rvG5Ln04Qzk7KPuHxoV0EW",
+            .url = "git+https://github.com/thomashn/cmocka.git#bcff7709c74f8fb05dcfbb41a0027478690e221c",
+            .hash = "cmocka-2.0.2-I28SctQqAAAbbgxJHnM3bEziRu0TkruTnFcW5A_dkjBN",
         },
     },
     .paths = .{

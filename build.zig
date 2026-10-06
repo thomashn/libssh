@@ -56,7 +56,7 @@ pub fn build(b: *std.Build) void {
         .libssh_VERSION_PATCH = patch,
     };
 
-    const root = c_libssh.path("");
+    const root = c_libssh.path(".");
 
     const version_header = b.addConfigHeader(.{
         .style = .{
@@ -79,7 +79,7 @@ pub fn build(b: *std.Build) void {
         enable_exec = !is_windows;
     }
 
-    var source_dir = root.getPath(b);
+    var source_dir = c_libssh.builder.root.root_dir.path orelse @panic("Missing root dir path");
     if (is_windows) {
         const dupe_path = b.allocator.dupe(u8, source_dir) catch @panic("OOM");
         for (dupe_path) |*char| {
@@ -88,6 +88,9 @@ pub fn build(b: *std.Build) void {
             }
         }
         source_dir = dupe_path;
+    }
+    defer {
+        if (is_windows) b.allocator.free(source_dir);
     }
 
     const config = .{
