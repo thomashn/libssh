@@ -2,7 +2,7 @@ const std = @import("std");
 
 const major = 0;
 const minor = 12;
-const patch = 0;
+const patch = 2;
 const version = std.fmt.comptimePrint("{}.{}.{}", .{ major, minor, patch });
 
 pub fn build(b: *std.Build) void {
